@@ -119,6 +119,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 .empty{text-align:center;padding:32px;color:var(--muted);font-size:13px;}
 
+.podio-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.podio-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 14px;text-align:center;position:relative;overflow:hidden;}
+.podio-card.p1{border-color:#d4af37;background:linear-gradient(180deg,rgba(212,175,55,.12),var(--surface2));order:2;}
+.podio-card.p2{border-color:#b8c2cc;order:1;margin-top:14px;}
+.podio-card.p3{border-color:#c98a4b;order:3;margin-top:22px;}
+.podio-medalla{font-size:26px;margin-bottom:4px;}
+.podio-puesto{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;}
+.podio-nombre{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;word-break:break-word;}
+.podio-pts{font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);}
+.podio-sub{font-size:10px;color:var(--muted);margin-top:4px;}
+@media(max-width:700px){
+  .podio-grid{grid-template-columns:1fr;}
+  .podio-card.p1,.podio-card.p2,.podio-card.p3{order:0;margin-top:0;}
+}
+
 @media(max-width:900px){
   :root{--sidebar-w:56px;}
   .sidebar-tab span.txt{display:none;}
@@ -170,14 +185,28 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div id="abox-resumen"></div>
 
         <div class="panel" style="margin-bottom:16px">
-          <div class="ptitle"><div class="d" style="background:var(--accent)"></div>Resumen General — Resultados Oficiales por Modalidad</div>
+          <div class="ptitle"><div class="d" style="background:var(--accent)"></div>Competencias Realizadas — Podio por Modalidad</div>
           <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">
-            Gana mayor puntaje. En caso de empate, gana menor tiempo insumido (no aplica en Mejor Presentación). Si el tiempo también es igual, se marca como empate técnico.
+            8 modalidades, cada una con su propio podio. Gana mayor puntaje; en caso de empate, gana menor tiempo insumido (no aplica en Mejor Presentación). Si el tiempo también es igual, se marca empate técnico. Click en cada modalidad para ver el podio completo.
           </div>
           <div class="twrap">
             <table class="dt">
-              <thead><tr><th>Modalidad</th><th>Líder</th><th>Puntaje</th><th>Tiempo</th><th>Estado</th></tr></thead>
+              <thead><tr><th>Modalidad</th><th>Evaluadas</th><th>Líder (1er puesto)</th><th>Puntaje</th><th>Estado</th></tr></thead>
               <tbody id="tbl-resultados-modalidad"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:16px">
+          <div class="ptitle"><div class="d" style="background:var(--y)"></div>Clasificación General — Suma de las 8 Modalidades</div>
+          <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">
+            Suma del puntaje obtenido por cada cuadrilla en todas las modalidades evaluadas. Solo se consideran ganadoras las cuadrillas con la cobertura más completa.
+          </div>
+          <div class="podio-grid" id="podio-general"></div>
+          <div class="twrap" style="margin-top:14px">
+            <table class="dt">
+              <thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Puntaje Total</th><th>Modalidades Evaluadas</th></tr></thead>
+              <tbody id="tbl-clasificacion-general"></tbody>
             </table>
           </div>
         </div>
@@ -187,17 +216,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div id="chart-cumpl-modalidad"></div>
         </div>
 
-        <div class="panels">
-          <div class="panel">
-            <div class="ptitle"><div class="d" style="background:var(--accent)"></div>Puntaje Acumulado Total (informativo)</div>
-            <div id="chart-ranking"></div>
-          </div>
+        <div class="panels eq">
           <div class="panel">
             <div class="ptitle"><div class="d" style="background:var(--r)"></div>Cuadrillas Sin Evaluaciones</div>
             <div id="alerts-sin-evaluar"></div>
           </div>
-        </div>
-        <div class="panels eq">
           <div class="panel">
             <div class="ptitle"><div class="d" style="background:var(--y)"></div>Evaluaciones Registradas por Juez</div>
             <div id="chart-juez"></div>
@@ -491,6 +514,53 @@ function calcularCumplimientoPorModalidad(){
 }
 
 /* ============================================================
+   CLASIFICACIÓN GENERAL — suma de las 8 modalidades
+   Desempate: menor tiempo total acumulado (en las modalidades que usan tiempo).
+   Si los tiempos también son iguales o no hay datos suficientes → empate técnico.
+   ============================================================ */
+function calcularClasificacionGeneral(){
+  const filas = CUADRILLAS.map(cuad=>{
+    const key0 = normaliza(cuad);
+    let total=0, evaluadas=0, tiempoTotalSeg=0, tieneTiempo=false;
+    MODALIDADES.forEach(mod=>{
+      const e = EVALS[key0+"|"+normaliza(mod)];
+      if(e){
+        total += e.puntaje;
+        evaluadas++;
+        if(normaliza(mod)!==MODALIDAD_SIN_DESEMPATE_TIEMPO && e.tiempoSeg!=null){
+          tiempoTotalSeg += e.tiempoSeg;
+          tieneTiempo = true;
+        }
+      }
+    });
+    return { cuadrilla:cuad, total, evaluadas, tiempoTotalSeg: tieneTiempo?tiempoTotalSeg:null };
+  }).filter(f=>f.evaluadas>0);
+
+  filas.sort((a,b)=>{
+    if(b.total !== a.total) return b.total - a.total;
+    const ta = a.tiempoTotalSeg==null ? Infinity : a.tiempoTotalSeg;
+    const tb = b.tiempoTotalSeg==null ? Infinity : b.tiempoTotalSeg;
+    return ta - tb;
+  });
+
+  let puestoActual=1;
+  for(let i=0;i<filas.length;i++){
+    if(i>0){
+      const prev=filas[i-1], cur=filas[i];
+      const mismoTotal = prev.total === cur.total;
+      const tiempoIgual = prev.tiempoTotalSeg!=null && cur.tiempoTotalSeg!=null && prev.tiempoTotalSeg===cur.tiempoTotalSeg;
+      if(!(mismoTotal && tiempoIgual)) puestoActual = i+1;
+    }
+    filas[i].puesto = puestoActual;
+  }
+  const conteoPuesto={};
+  filas.forEach(f=>{conteoPuesto[f.puesto]=(conteoPuesto[f.puesto]||0)+1;});
+  filas.forEach(f=>{ f.empateTecnico = conteoPuesto[f.puesto] > 1; });
+
+  return filas;
+}
+
+/* ============================================================
    RENDER HELPERS
    ============================================================ */
 function el(id){return document.getElementById(id);}
@@ -643,31 +713,92 @@ function renderResultadosModalidad(){
   const tbody = el('tbl-resultados-modalidad');
   if(!MODALIDADES.length){ tbody.innerHTML='<tr><td colspan="5" class="empty">Sin datos</td></tr>'; return; }
 
-  tbody.innerHTML = MODALIDADES.map(mod=>{
+  tbody.innerHTML = MODALIDADES.map((mod,idx)=>{
     const {filas, usaTiempo} = calcularResultadosModalidad(mod);
+    const uid = `mod-${idx}`;
+
     if(!filas.length){
       return `<tr>
         <td><strong>${mod}</strong></td>
-        <td colspan="4" style="color:var(--muted);font-style:italic">Sin evaluaciones registradas</td>
+        <td class="mono">0/${CUADRILLAS.length}</td>
+        <td colspan="3" style="color:var(--muted);font-style:italic">Sin evaluaciones registradas</td>
       </tr>`;
     }
+
     const lider = filas[0];
-    const nombreLider = lider.participante ? `${lider.cuadrilla} <span style="color:var(--muted);font-size:10px">(${lider.participante})</span>` : lider.cuadrilla;
+    const nombreLider = lider.participante ? `${lider.cuadrilla} (${lider.participante})` : lider.cuadrilla;
     let estado;
     if(lider.empateTecnico){
-      estado = `<span class="mod-status mod-pend">⚖ Empate técnico (${filas.filter(f=>f.puesto===1).map(f=>f.cuadrilla).join(', ')})</span>`;
+      estado = `<span class="mod-status mod-pend">⚖ Empate técnico</span>`;
     } else {
-      estado = `<span class="mod-status mod-ok">🏆 1er puesto</span>`;
+      estado = `<span class="mod-status mod-ok">🏆 Definido</span>`;
     }
-    const tiempoTxt = usaTiempo ? (lider.tiempoTxt || (lider.tiempoSeg!=null?segundosATiempo(lider.tiempoSeg):'—')) : '—';
+
+    const detailRows = filas.map(f=>{
+      const medalla = f.puesto===1?'🥇':f.puesto===2?'🥈':f.puesto===3?'🥉':'';
+      const nombre = f.participante ? `${f.cuadrilla} <span style="color:var(--muted);font-size:10px">(${f.participante})</span>` : f.cuadrilla;
+      const tiempoTxt = usaTiempo ? (f.tiempoTxt || (f.tiempoSeg!=null?segundosATiempo(f.tiempoSeg):'—')) : '—';
+      const estadoFila = f.empateTecnico ? '<span class="mod-status mod-pend">⚖ Empate</span>' : '';
+      return `<tr class="brecha-mod-row">
+        <td style="width:40px">${medalla || f.puesto+'°'}</td>
+        <td colspan="2">${nombre}</td>
+        <td class="mono" style="color:var(--accent)">${f.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
+        <td class="mono">${tiempoTxt} ${estadoFila}</td>
+      </tr>`;
+    }).join('');
+
     return `<tr>
-      <td><strong>${mod}</strong></td>
+      <td><div class="brecha-toggle" onclick="toggleGenerico('${uid}',this)"><span class="brecha-arrow open">▶</span><strong>${mod}</strong></div></td>
+      <td class="mono">${filas.length}/${CUADRILLAS.length}</td>
       <td>${nombreLider}</td>
       <td class="mono" style="color:var(--accent);font-weight:700">${lider.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
-      <td class="mono">${tiempoTxt}</td>
       <td>${estado}</td>
-    </tr>`;
+    </tr>
+    <tr class="brecha-detail open" id="${uid}"><td colspan="5" style="padding:0">
+      <table style="width:100%;border-collapse:collapse">${detailRows}</table>
+    </td></tr>`;
   }).join('');
+}
+
+function renderClasificacionGeneral(){
+  const filas = calcularClasificacionGeneral();
+  const podioC = el('podio-general');
+  const tbody = el('tbl-clasificacion-general');
+
+  if(!filas.length){
+    podioC.innerHTML = '<div class="empty">Todavía no hay evaluaciones suficientes para armar la clasificación general</div>';
+    tbody.innerHTML = '';
+    return;
+  }
+
+  const top3 = filas.slice(0,3);
+  const medallas = ['p1','p2','p3'];
+  const iconos = ['🥇','🥈','🥉'];
+  const etiquetas = ['1er Puesto','2do Puesto','3er Puesto'];
+  podioC.innerHTML = top3.map((f,i)=>`
+    <div class="podio-card ${medallas[i]}">
+      <div class="podio-medalla">${iconos[i]}</div>
+      <div class="podio-puesto">${etiquetas[i]}${f.empateTecnico?' (empate técnico)':''}</div>
+      <div class="podio-nombre">${f.cuadrilla}</div>
+      <div class="podio-pts">${f.total.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</div>
+      <div class="podio-sub">${f.evaluadas}/${MODALIDADES.length} modalidades evaluadas${f.tiempoTotalSeg!=null?' · '+segundosATiempo(f.tiempoTotalSeg)+' tiempo total':''}</div>
+    </div>`).join('');
+
+  tbody.innerHTML = filas.map(f=>`
+    <tr>
+      <td class="mono" style="font-weight:700;color:${f.puesto<=3?'var(--accent)':'var(--text)'}">${f.puesto}°${f.empateTecnico?' ⚖':''}</td>
+      <td>${f.cuadrilla}</td>
+      <td class="mono" style="color:var(--accent);font-weight:700">${f.total.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
+      <td class="mono" style="color:var(--muted)">${f.evaluadas}/${MODALIDADES.length}</td>
+    </tr>`).join('');
+}
+
+function toggleGenerico(uid, toggleEl){
+  const detail=document.getElementById(uid);
+  const arrow=toggleEl.querySelector('.brecha-arrow');
+  const isOpen=detail.classList.contains('open');
+  detail.classList.toggle('open',!isOpen);
+  arrow.classList.toggle('open',!isOpen);
 }
 
 function renderCumplimientoModalidadResumen(){
@@ -709,13 +840,10 @@ function renderAll(){
     aboxR.innerHTML = `<div class="abox ok">✅ <span>Cobertura completa — todas las cuadrillas fueron evaluadas en las ${MODALIDADES.length} modalidades.</span></div>`;
   }
 
-  const ranking = [...porCuadrilla].sort((a,b)=>b.total-a.total)
-    .map(r=>[r.cuadrilla+(r.evaluadas<MODALIDADES.length?` (${r.evaluadas}/${MODALIDADES.length})`:''), r.total]);
-  renderBars('chart-ranking', ranking, 'var(--accent)', 10);
-
   renderAlertsSinEvaluar(porCuadrilla);
 
   renderResultadosModalidad();
+  renderClasificacionGeneral();
   renderCumplimientoModalidadResumen();
 
   // Actividad por juez
