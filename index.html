@@ -36,6 +36,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .sidebar-tab:hover{background:var(--surface2);color:var(--text);}
 .sidebar-tab.at-g{background:rgba(45,212,160,.1);color:var(--g);}
 .sidebar-tab.at-b{background:rgba(74,159,212,.1);color:var(--b);}
+.sidebar-tab.at-accent{background:rgba(200,169,110,.12);color:var(--accent);}
+.sidebar-tab-mod{font-size:11.5px;padding:7px 10px;}
 .sidebar-icon{font-size:14px;}
 .sidebar-sep{height:1px;background:var(--border);margin:10px 20px;}
 .sidebar-bottom{margin-top:auto;padding:16px 20px 0;}
@@ -161,6 +163,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <button class="sidebar-tab at-g" id="st0" onclick="switchTab(0,this)"><span class="sidebar-icon">📊</span><span class="txt">Resumen Ejecutivo</span></button>
     <button class="sidebar-tab" id="st1" onclick="switchTab(1,this)"><span class="sidebar-icon">✅</span><span class="txt">Cumplimiento</span></button>
     <div class="sidebar-sep"></div>
+    <div class="sidebar-label">Modalidades</div>
+    <div id="sidebarModalidades"></div>
+    <div class="sidebar-sep"></div>
     <div class="sidebar-bottom">
       <div class="client-logo-wrap">
         <div class="client-logo-label">Evento</div>
@@ -250,6 +255,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             <table class="dt" id="tbl-cumpl-wrap">
               <thead id="thead-cumpl"><tr><th>Cuadrilla</th><th>Evaluadas</th><th>Pendientes</th><th>Cumpl.</th></tr></thead>
               <tbody id="tbl-cumpl"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- DETALLE POR MODALIDAD (dinámico) -->
+      <div class="sec" id="s2">
+        <div class="ptitle" style="font-size:16px;letter-spacing:normal;text-transform:none;color:var(--text);margin-bottom:4px" id="tituloModalidadDetalle">Modalidad</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px" id="subtituloModalidadDetalle"></div>
+
+        <div class="krow" id="kpi-modalidad-detalle"></div>
+
+        <div class="panel" style="margin-bottom:16px">
+          <div class="ptitle"><div class="d" style="background:var(--accent)"></div>Rendimiento por Cuadrilla</div>
+          <div id="chart-modalidad-detalle"></div>
+        </div>
+
+        <div class="panel">
+          <div class="ptitle"><div class="d" style="background:var(--muted)"></div>Detalle Completo — Juez, Criterios y Cumplimiento</div>
+          <div class="twrap">
+            <table class="dt">
+              <thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Juez</th><th>Puntaje</th><th>Tiempo</th><th>Estado</th></tr></thead>
+              <tbody id="tbl-modalidad-detalle"></tbody>
             </table>
           </div>
         </div>
@@ -403,6 +431,7 @@ async function loadData(manual){
     setSync('live', `En vivo — ${Object.keys(EVALS).length} evaluaciones registradas en Hoja 4`);
 
     poblarSelectorModalidad();
+    poblarSidebarModalidades();
     renderAll();
   }catch(err){
     setSync('error','Sin conexión — revisá que "Hoja 4" esté publicada en la Web (Archivo → Compartir → Publicar en la Web)');
@@ -631,6 +660,29 @@ function poblarSelectorModalidad(){
   if(MODALIDADES.includes(valorPrevio)) sel.value = valorPrevio;
 }
 
+let MODALIDAD_ACTIVA_DETALLE = null;
+
+function poblarSidebarModalidades(){
+  const cont = el('sidebarModalidades');
+  const iconos = {
+    'USO DE MACHETE':'🔪','USO DE MOTOSIERRA':'🪚','DESPLIEGUE DE MANGAS':'🚒',
+    'CARTOGRAFÍA Y NAVEGACIÓN TERRESTRE':'🧭','LINEA DE DEFENSA':'🔥',
+    'USO DE PULASKY':'⛏️','USO DE GORGY':'🪓','MEJOR PRESENTACIÓN':'🎖️'
+  };
+  cont.innerHTML = MODALIDADES.map((mod,idx)=>{
+    const icono = iconos[mod.trim().toUpperCase()] || '📋';
+    return `<button class="sidebar-tab sidebar-tab-mod" id="stmod${idx}" onclick="irAModalidad('${mod.replace(/'/g,"\\'")}',this)">
+      <span class="sidebar-icon">${icono}</span><span class="txt">${mod}</span>
+    </button>`;
+  }).join('');
+}
+
+function irAModalidad(modalidad, btnEl){
+  MODALIDAD_ACTIVA_DETALLE = modalidad;
+  switchTab(2, btnEl);
+  renderModalidadDetalle(modalidad);
+}
+
 function renderCumplTable(rows){
   const modalidadFiltro = el('selModalidadFiltro').value;
   const thead = el('thead-cumpl');
@@ -801,6 +853,78 @@ function toggleGenerico(uid, toggleEl){
   arrow.classList.toggle('open',!isOpen);
 }
 
+/* ============================================================
+   VISTA DE DETALLE POR MODALIDAD (click desde el sidebar)
+   ============================================================ */
+function renderModalidadDetalle(modalidad){
+  el('tituloModalidadDetalle').textContent = modalidad;
+  const {filas, usaTiempo} = calcularResultadosModalidad(modalidad);
+  const evaluadas = filas.length;
+  const pendientes = CUADRILLAS.length - evaluadas;
+  const pct = CUADRILLAS.length ? Math.round(evaluadas/CUADRILLAS.length*100) : 0;
+  const promedio = evaluadas ? (filas.reduce((s,f)=>s+f.puntaje,0)/evaluadas) : 0;
+  const lider = filas[0];
+
+  el('subtituloModalidadDetalle').textContent =
+    `Podio, rendimiento y detalle de evaluación completo de esta modalidad — ${evaluadas} de ${CUADRILLAS.length} cuadrillas evaluadas`;
+
+  renderKPIs('kpi-modalidad-detalle',[
+    {lbl:'Cuadrillas Evaluadas', val:evaluadas+'/'+CUADRILLAS.length, sub:pct+'% de cobertura', color:'var(--b)', valColor:pct>=80?'var(--g)':pct>=50?'var(--y)':'var(--r)'},
+    {lbl:'Líder Actual', val: lider ? lider.cuadrilla : '—', sub: lider ? (lider.participante||'Sin participante individual') : 'Sin evaluaciones', color:'var(--accent)'},
+    {lbl:'Puntaje del Líder', val: lider ? lider.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1}) : '—', sub:'Puntos', color:'var(--g)', valColor:'var(--g)'},
+    {lbl:'Puntaje Promedio', val: promedio.toLocaleString('es-PY',{maximumFractionDigits:1}), sub:'De todas las evaluadas', color:'var(--y)'},
+  ]);
+
+  // Gráfico de rendimiento: barras por cuadrilla, ya ordenadas de mayor a menor puntaje
+  const entradasChart = filas.map(f=>[
+    f.cuadrilla + (f.participante ? ` (${f.participante})` : ''),
+    f.puntaje
+  ]);
+  renderBars('chart-modalidad-detalle', entradasChart, 'var(--accent)', filas.length || 1);
+
+  // Tabla de detalle completo — click para ver criterio por criterio con juez y cumplimiento
+  const tbody = el('tbl-modalidad-detalle');
+  if(!filas.length){
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Todavía no hay evaluaciones registradas para esta modalidad</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filas.map((f,idx)=>{
+    const uid = `moddet-${idx}`;
+    const medalla = f.puesto===1?'🥇':f.puesto===2?'🥈':f.puesto===3?'🥉':(f.puesto+'°');
+    const key = normaliza(f.cuadrilla)+"|"+normaliza(modalidad);
+    const criterios = DETALLE_CRITERIOS[key]||[];
+    const tiempoTxt = usaTiempo ? (f.tiempoTxt || (f.tiempoSeg!=null?segundosATiempo(f.tiempoSeg):'—')) : '—';
+    const estado = f.empateTecnico ? '<span class="mod-status mod-pend">⚖ Empate técnico</span>' : (f.puesto<=3 ? '<span class="mod-status mod-ok">🏆 Podio</span>' : '');
+
+    const detailRows = criterios.map(c=>`
+      <tr class="brecha-mod-row">
+        <td style="width:170px">${c.criterio}</td>
+        <td>${c.cumplimiento || '—'}</td>
+        <td style="width:90px;color:var(--g)" class="mono">${c.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
+      </tr>`).join('');
+
+    return `<tr>
+      <td class="mono" style="font-weight:700;color:${f.puesto<=3?'var(--accent)':'var(--text)'}">${medalla}</td>
+      <td>
+        <div class="brecha-toggle" onclick="toggleGenerico('${uid}',this)">
+          <span class="brecha-arrow">▶</span>
+          <strong>${f.cuadrilla}</strong>${f.participante?` <span style="color:var(--muted);font-size:10.5px">(${f.participante})</span>`:''}
+        </div>
+      </td>
+      <td>${f.juez||'—'}</td>
+      <td class="mono" style="color:var(--accent);font-weight:700">${f.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
+      <td class="mono">${tiempoTxt}</td>
+      <td>${estado}</td>
+    </tr>
+    <tr class="brecha-detail" id="${uid}"><td colspan="6" style="padding:0">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr class="brecha-mod-row" style="color:var(--muted)"><td style="width:170px"><strong>Criterio</strong></td><td><strong>Cumplimiento logrado</strong></td><td style="width:90px"><strong>Puntaje</strong></td></tr></thead>
+        <tbody>${detailRows || '<tr class="brecha-mod-row"><td colspan="3" style="color:var(--muted);font-style:italic">Sin detalle de criterios disponible</td></tr>'}</tbody>
+      </table>
+    </td></tr>`;
+  }).join('');
+}
+
 function renderCumplimientoModalidadResumen(){
   const c = el('chart-cumpl-modalidad');
   const filas = calcularCumplimientoPorModalidad();
@@ -870,14 +994,17 @@ function renderAll(){
   const cumplSorted = [...porCuadrilla].sort((a,b)=>b.pct-a.pct);
   renderStacked('chart-cumpl-stacked', cumplSorted);
   renderCumplTable(cumplSorted);
+
+  /* ---- DETALLE POR MODALIDAD (si está abierta) ---- */
+  if(MODALIDAD_ACTIVA_DETALLE) renderModalidadDetalle(MODALIDAD_ACTIVA_DETALLE);
 }
 
 /* ============================================================
    TABS
    ============================================================ */
 function switchTab(i, elBtn){
-  document.querySelectorAll('.sidebar-tab').forEach(t=>t.classList.remove('at-g','at-b'));
-  elBtn.classList.add(i===0?'at-g':'at-b');
+  document.querySelectorAll('.sidebar-tab').forEach(t=>t.classList.remove('at-g','at-b','at-accent'));
+  elBtn.classList.add(i===0?'at-g':i===1?'at-b':'at-accent');
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('on'));
   document.getElementById('s'+i).classList.add('on');
 }
