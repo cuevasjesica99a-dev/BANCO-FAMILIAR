@@ -190,6 +190,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div id="abox-resumen"></div>
 
         <div class="panel" style="margin-bottom:16px">
+          <div class="ptitle"><div class="d" style="background:var(--y)"></div>Clasificación General — Suma de las 8 Modalidades</div>
+          <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">
+            Suma del puntaje obtenido por cada cuadrilla en todas las modalidades evaluadas. Solo se consideran ganadoras las cuadrillas con la cobertura más completa.
+          </div>
+          <div class="podio-grid" id="podio-general"></div>
+
+          <div style="margin-top:20px">
+            <div class="ptitle" style="font-size:10px"><div class="d" style="background:var(--accent)"></div>Resumen Visual — Puntaje Acumulado por Cuadrilla</div>
+            <div id="chart-clasificacion-general"></div>
+          </div>
+
+          <div class="twrap" style="margin-top:14px">
+            <table class="dt">
+              <thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Puntaje Total</th><th>Modalidades Evaluadas</th></tr></thead>
+              <tbody id="tbl-clasificacion-general"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:16px">
           <div class="ptitle"><div class="d" style="background:var(--accent)"></div>Competencias Realizadas — Podio por Modalidad</div>
           <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">
             8 modalidades, cada una con su propio podio. Gana mayor puntaje; en caso de empate, gana menor tiempo insumido (no aplica en Mejor Presentación). Si el tiempo también es igual, se marca empate técnico. Click en cada modalidad para ver el podio completo.
@@ -202,34 +222,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           </div>
         </div>
 
-        <div class="panel" style="margin-bottom:16px">
-          <div class="ptitle"><div class="d" style="background:var(--y)"></div>Clasificación General — Suma de las 8 Modalidades</div>
-          <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">
-            Suma del puntaje obtenido por cada cuadrilla en todas las modalidades evaluadas. Solo se consideran ganadoras las cuadrillas con la cobertura más completa.
-          </div>
-          <div class="podio-grid" id="podio-general"></div>
-          <div class="twrap" style="margin-top:14px">
-            <table class="dt">
-              <thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Puntaje Total</th><th>Modalidades Evaluadas</th></tr></thead>
-              <tbody id="tbl-clasificacion-general"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="panel" style="margin-bottom:16px">
+        <div class="panel">
           <div class="ptitle"><div class="d" style="background:var(--b)"></div>Cumplimiento Resumen por Modalidad</div>
           <div id="chart-cumpl-modalidad"></div>
-        </div>
-
-        <div class="panels eq">
-          <div class="panel">
-            <div class="ptitle"><div class="d" style="background:var(--r)"></div>Cuadrillas Sin Evaluaciones</div>
-            <div id="alerts-sin-evaluar"></div>
-          </div>
-          <div class="panel">
-            <div class="ptitle"><div class="d" style="background:var(--y)"></div>Evaluaciones Registradas por Juez</div>
-            <div id="chart-juez"></div>
-          </div>
         </div>
       </div>
 
@@ -815,10 +810,12 @@ function renderResultadosModalidad(){
 function renderClasificacionGeneral(){
   const filas = calcularClasificacionGeneral();
   const podioC = el('podio-general');
+  const chartC = el('chart-clasificacion-general');
   const tbody = el('tbl-clasificacion-general');
 
   if(!filas.length){
     podioC.innerHTML = '<div class="empty">Todavía no hay evaluaciones suficientes para armar la clasificación general</div>';
+    chartC.innerHTML = '';
     tbody.innerHTML = '';
     return;
   }
@@ -835,6 +832,10 @@ function renderClasificacionGeneral(){
       <div class="podio-pts">${f.total.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</div>
       <div class="podio-sub">${f.evaluadas}/${MODALIDADES.length} modalidades evaluadas${f.tiempoTotalSeg!=null?' · '+segundosATiempo(f.tiempoTotalSeg)+' tiempo total':''}</div>
     </div>`).join('');
+
+  // Gráfico de barras horizontal con el puntaje acumulado de todas las cuadrillas
+  const entradasChart = filas.map(f=>[f.cuadrilla+(f.empateTecnico?' ⚖':''), f.total]);
+  renderBars('chart-clasificacion-general', entradasChart, 'var(--accent)', filas.length);
 
   tbody.innerHTML = filas.map(f=>`
     <tr>
@@ -948,11 +949,16 @@ function renderAll(){
   const pendientesTotal = totalEsperado - totalEvaluado;
 
   /* ---- RESUMEN EJECUTIVO ---- */
+  const cumplModalidad = calcularCumplimientoPorModalidad();
+  const modalidadesPendientes = cumplModalidad.filter(m=>m.pct<100).length;
+  const clasifGeneral = calcularClasificacionGeneral();
+  const primerPuesto = clasifGeneral[0];
+
   renderKPIs('kpi-resumen',[
-    {lbl:'Evaluaciones Registradas', val:totalEvaluado, sub:`de ${totalEsperado} esperadas`, color:'var(--accent)'},
-    {lbl:'Cuadrillas con Registro', val:cuadrillasConAlgo+'/'+CUADRILLAS.length, sub:'Al menos 1 modalidad', color:'var(--b)'},
-    {lbl:'Cobertura General', val:cumplPct+'%', sub:'Meta: 100%', color:'var(--g)', valColor:cumplPct>=80?'var(--g)':cumplPct>=50?'var(--y)':'var(--r)'},
-    {lbl:'Puntaje Promedio', val:promedioGeneral.toLocaleString('es-PY',{maximumFractionDigits:1}), sub:'Por modalidad evaluada', color:'var(--y)'},
+    {lbl:'Total de Modalidades', val:MODALIDADES.length, sub:'A ser evaluadas', color:'var(--b)'},
+    {lbl:'Modalidades Pendientes', val:modalidadesPendientes, sub:'Con cobertura incompleta', color:'var(--r)', valColor:modalidadesPendientes>0?'var(--r)':'var(--g)'},
+    {lbl:'Cuadrillas en Competencia', val:CUADRILLAS.length, sub:'Total inscriptas', color:'var(--accent)'},
+    {lbl:'1er Puesto', val: primerPuesto ? primerPuesto.cuadrilla : '—', sub: primerPuesto ? primerPuesto.total.toLocaleString('es-PY',{maximumFractionDigits:1})+' pts'+(primerPuesto.empateTecnico?' · empate técnico':'') : 'Sin evaluaciones', color:'var(--y)', valColor:'var(--g)'},
   ]);
 
   const aboxR = el('abox-resumen');
@@ -964,20 +970,9 @@ function renderAll(){
     aboxR.innerHTML = `<div class="abox ok">✅ <span>Cobertura completa — todas las cuadrillas fueron evaluadas en las ${MODALIDADES.length} modalidades.</span></div>`;
   }
 
-  renderAlertsSinEvaluar(porCuadrilla);
-
   renderResultadosModalidad();
   renderClasificacionGeneral();
   renderCumplimientoModalidadResumen();
-
-  // Actividad por juez
-  const porJuez={};
-  Object.values(EVALS).forEach(e=>{
-    const j=e.juez||'(sin dato)';
-    porJuez[j]=(porJuez[j]||0)+1;
-  });
-  const juezEntries = Object.entries(porJuez).sort((a,b)=>b[1]-a[1]);
-  renderBars('chart-juez', juezEntries, 'var(--y)', 10);
 
   /* ---- CUMPLIMIENTO ---- */
   renderKPIs('kpi-cumpl',[
