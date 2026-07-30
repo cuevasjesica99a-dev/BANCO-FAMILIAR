@@ -221,11 +221,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             </table>
           </div>
         </div>
-
-        <div class="panel">
-          <div class="ptitle"><div class="d" style="background:var(--b)"></div>Cumplimiento Resumen por Modalidad</div>
-          <div id="chart-cumpl-modalidad"></div>
-        </div>
       </div>
 
       <!-- CUMPLIMIENTO -->
@@ -837,13 +832,29 @@ function renderClasificacionGeneral(){
   const entradasChart = filas.map(f=>[f.cuadrilla+(f.empateTecnico?' ⚖':''), f.total]);
   renderBars('chart-clasificacion-general', entradasChart, 'var(--accent)', filas.length);
 
-  tbody.innerHTML = filas.map(f=>`
-    <tr>
+  tbody.innerHTML = filas.map((f,idx)=>{
+    const uid = `clasif-${idx}`;
+    // Desglose de puntaje por cada una de las 8 modalidades para esta cuadrilla
+    const detalleModalidad = MODALIDADES.map(mod=>{
+      const e = EVALS[normaliza(f.cuadrilla)+"|"+normaliza(mod)];
+      return { modalidad: mod, evaluado: !!e, puntaje: e ? e.puntaje : null };
+    });
+    const detailRows = detalleModalidad.map(d=>`
+      <tr class="brecha-mod-row">
+        <td colspan="3">${d.modalidad}</td>
+        <td><span class="mod-status ${d.evaluado?'mod-ok':'mod-pend'}">${d.evaluado ? d.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})+' pts' : '✗ Pendiente'}</span></td>
+      </tr>`).join('');
+
+    return `<tr>
       <td class="mono" style="font-weight:700;color:${f.puesto<=3?'var(--accent)':'var(--text)'}">${f.puesto}°${f.empateTecnico?' ⚖':''}</td>
-      <td>${f.cuadrilla}</td>
+      <td><div class="brecha-toggle" onclick="toggleGenerico('${uid}',this)"><span class="brecha-arrow">▶</span><strong>${f.cuadrilla}</strong></div></td>
       <td class="mono" style="color:var(--accent);font-weight:700">${f.total.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
       <td class="mono" style="color:var(--muted)">${f.evaluadas}/${MODALIDADES.length}</td>
-    </tr>`).join('');
+    </tr>
+    <tr class="brecha-detail" id="${uid}"><td colspan="4" style="padding:0">
+      <table style="width:100%;border-collapse:collapse">${detailRows}</table>
+    </td></tr>`;
+  }).join('');
 }
 
 function toggleGenerico(uid, toggleEl){
@@ -972,7 +983,6 @@ function renderAll(){
 
   renderResultadosModalidad();
   renderClasificacionGeneral();
-  renderCumplimientoModalidadResumen();
 
   /* ---- CUMPLIMIENTO ---- */
   renderKPIs('kpi-cumpl',[
