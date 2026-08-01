@@ -450,10 +450,11 @@ async function loadData(manual){
         const fotoUrl=(fotoUrlRaw && !fotoUrlRaw.toUpperCase().startsWith("ERROR")) ? fotoUrlRaw : "";
         if(!cuadrilla||!modalidad) return;
         const key=normaliza(cuadrilla)+"|"+normaliza(modalidad);
-        // Nos quedamos con la entrada más reciente por combinación
-        if(!EVALS[key] || fecha > EVALS[key].fecha){
-          EVALS[key]={puntaje, fecha, juez, cuadrilla, modalidad, participante, tiempoRealTxt, tiempoSeg:tiempoASegundos(tiempoRealTxt), fotoUrl};
-        }
+        // Nos quedamos con la ÚLTIMA fila que aparece en la hoja para esa combinación:
+        // como el script solo agrega filas al final (nunca reordena), la última
+        // fila SIEMPRE es la carga más reciente — más confiable que comparar
+        // la fecha como texto (que puede fallar según el formato).
+        EVALS[key]={puntaje, fecha, juez, cuadrilla, modalidad, participante, tiempoRealTxt, tiempoSeg:tiempoASegundos(tiempoRealTxt), fotoUrl};
       });
 
       // Detalle por criterio (para mostrar juez + texto de cumplimiento por criterio)
@@ -470,6 +471,16 @@ async function loadData(manual){
         const key=normaliza(cuadrilla)+"|"+normaliza(modalidad);
         if(!DETALLE_CRITERIOS[key]) DETALLE_CRITERIOS[key]=[];
         DETALLE_CRITERIOS[key].push({criterio:f[headerIdx["CRITERIO"]], cumplimiento:cumplimientoTxt, puntaje:puntajeCrit, juez, fecha});
+      });
+
+      // Si hubo cargas duplicadas viejas para la misma combinación cuadrilla+modalidad,
+      // nos quedamos solo con los criterios que pertenecen a la carga ganadora (misma fecha
+      // que la fila "TOTAL MODALIDAD" que quedó en EVALS), para no mezclar detalle viejo con nuevo.
+      Object.keys(DETALLE_CRITERIOS).forEach(key=>{
+        const fechaGanadora = EVALS[key] ? EVALS[key].fecha : null;
+        if(fechaGanadora){
+          DETALLE_CRITERIOS[key] = DETALLE_CRITERIOS[key].filter(c => c.fecha === fechaGanadora);
+        }
       });
     }
 
