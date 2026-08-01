@@ -120,6 +120,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .mod-status{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;}
 .mod-ok{background:rgba(45,212,160,.12);color:var(--g);}
 .mod-pend{background:rgba(240,92,107,.12);color:var(--r);}
+.btn-evidencia{display:inline-block;font-size:10.5px;font-weight:700;color:var(--b);background:rgba(74,159,212,.12);border:1px solid rgba(74,159,212,.3);border-radius:10px;padding:3px 9px;text-decoration:none;white-space:nowrap;}
+.btn-evidencia:hover{background:rgba(74,159,212,.22);}
+.btn-imprimir-acta{padding:9px 16px;border-radius:8px;font-size:12.5px;font-weight:700;border:1px solid var(--accent);background:rgba(200,169,110,.12);color:var(--accent);cursor:pointer;}
+.btn-imprimir-acta:hover{background:rgba(200,169,110,.22);}
 
 .abox{display:flex;gap:10px;padding:12px 14px;border-radius:var(--radius-sm);border-left:4px solid;margin-bottom:14px;font-size:12.5px;line-height:1.5;}
 .abox.danger{border-color:var(--r);background:rgba(240,92,107,.07);}
@@ -149,6 +153,31 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   .podio-grid{grid-template-columns:1fr;}
   .podio-card.p1,.podio-card.p2,.podio-card.p3{order:0;margin-top:0;}
 }
+
+.acta-imprimir{display:none;}
+
+@media print{
+  body.imprimiendo .app-layout{display:none !important;}
+  body.imprimiendo .acta-imprimir{
+    display:block !important;
+    background:#fff;
+    color:#111;
+    font-family:'DM Sans',sans-serif;
+    padding:0;
+  }
+  @page{ margin:14mm; }
+}
+
+.acta-header{text-align:center;margin-bottom:18px;border-bottom:2px solid #1b4332;padding-bottom:10px;}
+.acta-header img{max-height:70px;margin-bottom:8px;}
+.acta-header h1{font-size:20px;margin:4px 0 2px;color:#1b1b1b;}
+.acta-header p{font-size:12px;color:#555;margin:0;}
+.acta-seccion{margin:22px 0 10px;font-size:14px;font-weight:700;color:#1b4332;border-bottom:1px solid #ccc;padding-bottom:4px;}
+.acta-tabla{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:10px;}
+.acta-tabla th{background:#f0f0f0;text-align:left;padding:5px 8px;border:1px solid #ccc;font-size:10.5px;text-transform:uppercase;}
+.acta-tabla td{padding:5px 8px;border:1px solid #ddd;color:#222;}
+.acta-podio-fila{font-weight:700;}
+.acta-footer{margin-top:24px;text-align:center;font-size:10px;color:#888;letter-spacing:.1em;}
 
 @media(max-width:900px){
   :root{--sidebar-w:56px;}
@@ -199,6 +228,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
       <!-- RESUMEN EJECUTIVO -->
       <div class="sec on" id="s0">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+          <button class="btn-imprimir-acta" onclick="imprimirActa()">🖨️ Imprimir Acta Final</button>
+        </div>
         <div class="krow" id="kpi-resumen"></div>
         <div id="abox-resumen"></div>
 
@@ -279,7 +311,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="ptitle"><div class="d" style="background:var(--muted)"></div>Detalle Completo — Juez, Criterios y Cumplimiento</div>
           <div class="twrap">
             <table class="dt">
-              <thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Juez</th><th>Puntaje</th><th>Tiempo</th><th>Estado</th></tr></thead>
+              <thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Juez</th><th>Puntaje</th><th>Tiempo</th><th>Estado</th><th>Evidencia</th></tr></thead>
               <tbody id="tbl-modalidad-detalle"></tbody>
             </table>
           </div>
@@ -292,6 +324,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
   </div>
 </div>
+
+<div id="actaImprimir" class="acta-imprimir"></div>
 
 <script>
 /* ============================================================
@@ -353,6 +387,12 @@ function segundosATiempo(seg){
 // En esta modalidad no aplica el desempate por tiempo (no tiene criterio de tiempo)
 const MODALIDAD_SIN_DESEMPATE_TIEMPO = "MEJOR PRESENTACION";
 
+// Genera el botón/link "Ver evidencia" a partir de la URL guardada en Hoja 4 (columna Evidencia Fotográfica)
+function botonEvidencia(fotoUrl){
+  if(!fotoUrl) return '<span style="color:var(--muted);font-size:10.5px">Sin foto</span>';
+  return `<a href="${fotoUrl}" target="_blank" rel="noopener" class="btn-evidencia">📷 Ver evidencia</a>`;
+}
+
 /* ============================================================
    ESTADO GLOBAL
    ============================================================ */
@@ -393,7 +433,7 @@ async function loadData(manual){
     if(filasHoja4.length>1){
       const headerIdx = {};
       const header=filasHoja4[0].map(h=>h.trim().toUpperCase());
-      ["FECHA Y HORA","JUEZ","CUADRILLA","MODALIDAD","PARTICIPANTE","CRITERIO","CUMPLIMIENTO","PUNTAJE","TIEMPO REAL"].forEach(col=>{
+      ["FECHA Y HORA","JUEZ","CUADRILLA","MODALIDAD","PARTICIPANTE","CRITERIO","CUMPLIMIENTO","PUNTAJE","TIEMPO REAL","EVIDENCIA FOTOGRÁFICA"].forEach(col=>{
         headerIdx[col]=header.indexOf(col);
       });
       filasHoja4.slice(1).forEach(f=>{
@@ -406,11 +446,13 @@ async function loadData(manual){
         const puntaje=parseFloat((f[headerIdx["PUNTAJE"]]||"0").toString().replace(",","."))||0;
         const fecha=f[headerIdx["FECHA Y HORA"]]||"";
         const tiempoRealTxt=headerIdx["TIEMPO REAL"]>-1 ? (f[headerIdx["TIEMPO REAL"]]||"") : "";
+        const fotoUrlRaw=headerIdx["EVIDENCIA FOTOGRÁFICA"]>-1 ? (f[headerIdx["EVIDENCIA FOTOGRÁFICA"]]||"") : "";
+        const fotoUrl=(fotoUrlRaw && !fotoUrlRaw.toUpperCase().startsWith("ERROR")) ? fotoUrlRaw : "";
         if(!cuadrilla||!modalidad) return;
         const key=normaliza(cuadrilla)+"|"+normaliza(modalidad);
         // Nos quedamos con la entrada más reciente por combinación
         if(!EVALS[key] || fecha > EVALS[key].fecha){
-          EVALS[key]={puntaje, fecha, juez, cuadrilla, modalidad, participante, tiempoRealTxt, tiempoSeg:tiempoASegundos(tiempoRealTxt)};
+          EVALS[key]={puntaje, fecha, juez, cuadrilla, modalidad, participante, tiempoRealTxt, tiempoSeg:tiempoASegundos(tiempoRealTxt), fotoUrl};
         }
       });
 
@@ -799,9 +841,10 @@ function renderResultadosModalidad(){
       const estadoFila = f.empateTecnico ? '<span class="mod-status mod-pend">⚖ Empate</span>' : '';
       return `<tr class="brecha-mod-row">
         <td style="width:40px">${medalla || f.puesto+'°'}</td>
-        <td colspan="2">${nombre}</td>
+        <td>${nombre}</td>
         <td class="mono" style="color:var(--accent)">${f.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
         <td class="mono">${tiempoTxt} ${estadoFila}</td>
+        <td>${botonEvidencia(f.fotoUrl)}</td>
       </tr>`;
     }).join('');
 
@@ -853,12 +896,13 @@ function renderClasificacionGeneral(){
     // Desglose de puntaje por cada una de las 8 modalidades para esta cuadrilla
     const detalleModalidad = MODALIDADES.map(mod=>{
       const e = EVALS[normaliza(f.cuadrilla)+"|"+normaliza(mod)];
-      return { modalidad: mod, evaluado: !!e, puntaje: e ? e.puntaje : null };
+      return { modalidad: mod, evaluado: !!e, puntaje: e ? e.puntaje : null, fotoUrl: e ? e.fotoUrl : "" };
     });
     const detailRows = detalleModalidad.map(d=>`
       <tr class="brecha-mod-row">
-        <td colspan="3">${d.modalidad}</td>
+        <td colspan="2">${d.modalidad}</td>
         <td><span class="mod-status ${d.evaluado?'mod-ok':'mod-pend'}">${d.evaluado ? d.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})+' pts' : '✗ Pendiente'}</span></td>
+        <td>${d.evaluado ? botonEvidencia(d.fotoUrl) : ''}</td>
       </tr>`).join('');
 
     return `<tr>
@@ -913,7 +957,7 @@ function renderModalidadDetalle(modalidad){
   // Tabla de detalle completo — click para ver criterio por criterio con juez y cumplimiento
   const tbody = el('tbl-modalidad-detalle');
   if(!filas.length){
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">Todavía no hay evaluaciones registradas para esta modalidad</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Todavía no hay evaluaciones registradas para esta modalidad</td></tr>';
     return;
   }
   tbody.innerHTML = filas.map((f,idx)=>{
@@ -943,8 +987,9 @@ function renderModalidadDetalle(modalidad){
       <td class="mono" style="color:var(--accent);font-weight:700">${f.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
       <td class="mono">${tiempoTxt}</td>
       <td>${estado}</td>
+      <td>${botonEvidencia(f.fotoUrl)}</td>
     </tr>
-    <tr class="brecha-detail" id="${uid}"><td colspan="6" style="padding:0">
+    <tr class="brecha-detail" id="${uid}"><td colspan="7" style="padding:0">
       <table style="width:100%;border-collapse:collapse">
         <thead><tr class="brecha-mod-row" style="color:var(--muted)"><td style="width:170px"><strong>Criterio</strong></td><td><strong>Cumplimiento logrado</strong></td><td style="width:90px"><strong>Puntaje</strong></td></tr></thead>
         <tbody>${detailRows || '<tr class="brecha-mod-row"><td colspan="3" style="color:var(--muted);font-style:italic">Sin detalle de criterios disponible</td></tr>'}</tbody>
@@ -969,6 +1014,80 @@ function renderCumplimientoModalidadResumen(){
     </div>`;
   }).join('');
 }
+
+/* ============================================================
+   IMPRESIÓN DEL ACTA FINAL
+   ============================================================ */
+function generarActaImprimir(){
+  const logoImg = document.querySelector('.brand-logo-escudos');
+  const logoSrc = logoImg ? logoImg.src : '';
+  const ahora = new Date();
+  const fechaTxt = ahora.toLocaleDateString('es-PY', {day:'2-digit',month:'2-digit',year:'numeric'}) +
+                   ' ' + ahora.toLocaleTimeString('es-PY', {hour:'2-digit',minute:'2-digit'});
+
+  const clasifGeneral = calcularClasificacionGeneral();
+
+  let html = `
+    <div class="acta-header">
+      ${logoSrc ? `<img src="${logoSrc}" alt="CBVP"/>` : ''}
+      <h1>ACTA FINAL DE RESULTADOS</h1>
+      <p>8va. Movilización Forestal — Cuerpo de Bomberos Voluntarios del Paraguay</p>
+      <p>Generado el ${fechaTxt}</p>
+    </div>
+  `;
+
+  html += `<div class="acta-seccion">🥇 Clasificación General</div>`;
+  if(!clasifGeneral.length){
+    html += `<p style="font-size:12px;color:#777">Sin evaluaciones suficientes al momento de generar este acta.</p>`;
+  } else {
+    html += `<table class="acta-tabla"><thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Puntaje Total</th><th>Modalidades Evaluadas</th><th>Estado</th></tr></thead><tbody>`;
+    clasifGeneral.forEach(f=>{
+      html += `<tr class="${f.puesto<=3?'acta-podio-fila':''}">
+        <td>${f.puesto}°</td>
+        <td>${f.cuadrilla}</td>
+        <td>${f.total.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
+        <td>${f.evaluadas}/${MODALIDADES.length}</td>
+        <td>${f.empateTecnico ? 'Empate técnico' : ''}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  MODALIDADES.forEach(mod=>{
+    const {filas, usaTiempo} = calcularResultadosModalidad(mod);
+    html += `<div class="acta-seccion">🏆 ${mod}</div>`;
+    if(!filas.length){
+      html += `<p style="font-size:12px;color:#777">Sin evaluaciones registradas en esta modalidad.</p>`;
+      return;
+    }
+    html += `<table class="acta-tabla"><thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Participante</th><th>Puntaje</th><th>Tiempo</th><th>Estado</th></tr></thead><tbody>`;
+    filas.forEach(f=>{
+      const tiempoTxt = usaTiempo ? (f.tiempoTxt || (f.tiempoSeg!=null?segundosATiempo(f.tiempoSeg):'—')) : '—';
+      html += `<tr class="${f.puesto<=3?'acta-podio-fila':''}">
+        <td>${f.puesto}°</td>
+        <td>${f.cuadrilla}</td>
+        <td>${f.participante||'—'}</td>
+        <td>${f.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
+        <td>${tiempoTxt}</td>
+        <td>${f.empateTecnico ? 'Empate técnico' : ''}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  });
+
+  html += `<div class="acta-footer">UFIR — Documento generado automáticamente por el sistema de puntaje</div>`;
+
+  document.getElementById('actaImprimir').innerHTML = html;
+}
+
+function imprimirActa(){
+  generarActaImprimir();
+  document.body.classList.add('imprimiendo');
+  window.print();
+}
+window.addEventListener('afterprint', () => {
+  document.body.classList.remove('imprimiendo');
+});
 
 function renderAll(){
   const {porCuadrilla, totalEsperado, totalEvaluado, cuadrillasConAlgo, promedioGeneral, juecesActivos} = calcularResumen();
