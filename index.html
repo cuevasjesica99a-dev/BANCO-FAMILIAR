@@ -432,7 +432,7 @@ async function loadData(manual){
     EVALS={};
     if(filasHoja4.length>1){
       const headerIdx = {};
-      const header=filasHoja4[0].map(h=>h.trim().toUpperCase());
+      const header=filasHoja4[0].map(h=>h.trim().toUpperCase().replace(/\s+/g,' '));
       ["FECHA Y HORA","JUEZ","CUADRILLA","MODALIDAD","PARTICIPANTE","CRITERIO","CUMPLIMIENTO","PUNTAJE","TIEMPO REAL","EVIDENCIA FOTOGRÁFICA"].forEach(col=>{
         headerIdx[col]=header.indexOf(col);
       });
