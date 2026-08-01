@@ -311,7 +311,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="ptitle"><div class="d" style="background:var(--muted)"></div>Detalle Completo — Juez, Criterios y Cumplimiento</div>
           <div class="twrap">
             <table class="dt">
-              <thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Juez</th><th>Puntaje</th><th>Tiempo</th><th>Estado</th><th>Evidencia</th></tr></thead>
+              <thead><tr><th>Puesto</th><th>Cuadrilla</th><th>Juez</th><th>Puntaje</th><th>Tiempo</th><th>Estado</th></tr></thead>
               <tbody id="tbl-modalidad-detalle"></tbody>
             </table>
           </div>
@@ -320,7 +320,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
     </div>
 
-    <footer class="firma-ufir">UFIR</footer>
+    <footer class="firma-ufir">SISTEMA CREADO POR LA UNIDAD FORESTAL DE INTERVENCIÓN RÁPIDA</footer>
 
   </div>
 </div>
@@ -855,7 +855,6 @@ function renderResultadosModalidad(){
         <td>${nombre}</td>
         <td class="mono" style="color:var(--accent)">${f.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
         <td class="mono">${tiempoTxt} ${estadoFila}</td>
-        <td>${botonEvidencia(f.fotoUrl)}</td>
       </tr>`;
     }).join('');
 
@@ -911,9 +910,8 @@ function renderClasificacionGeneral(){
     });
     const detailRows = detalleModalidad.map(d=>`
       <tr class="brecha-mod-row">
-        <td colspan="2">${d.modalidad}</td>
+        <td colspan="3">${d.modalidad}</td>
         <td><span class="mod-status ${d.evaluado?'mod-ok':'mod-pend'}">${d.evaluado ? d.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})+' pts' : '✗ Pendiente'}</span></td>
-        <td>${d.evaluado ? botonEvidencia(d.fotoUrl) : ''}</td>
       </tr>`).join('');
 
     return `<tr>
@@ -968,7 +966,7 @@ function renderModalidadDetalle(modalidad){
   // Tabla de detalle completo — click para ver criterio por criterio con juez y cumplimiento
   const tbody = el('tbl-modalidad-detalle');
   if(!filas.length){
-    tbody.innerHTML = '<tr><td colspan="7" class="empty">Todavía no hay evaluaciones registradas para esta modalidad</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Todavía no hay evaluaciones registradas para esta modalidad</td></tr>';
     return;
   }
   tbody.innerHTML = filas.map((f,idx)=>{
@@ -998,9 +996,8 @@ function renderModalidadDetalle(modalidad){
       <td class="mono" style="color:var(--accent);font-weight:700">${f.puntaje.toLocaleString('es-PY',{maximumFractionDigits:1})} pts</td>
       <td class="mono">${tiempoTxt}</td>
       <td>${estado}</td>
-      <td>${botonEvidencia(f.fotoUrl)}</td>
     </tr>
-    <tr class="brecha-detail" id="${uid}"><td colspan="7" style="padding:0">
+    <tr class="brecha-detail" id="${uid}"><td colspan="6" style="padding:0">
       <table style="width:100%;border-collapse:collapse">
         <thead><tr class="brecha-mod-row" style="color:var(--muted)"><td style="width:170px"><strong>Criterio</strong></td><td><strong>Cumplimiento logrado</strong></td><td style="width:90px"><strong>Puntaje</strong></td></tr></thead>
         <tbody>${detailRows || '<tr class="brecha-mod-row"><td colspan="3" style="color:var(--muted);font-style:italic">Sin detalle de criterios disponible</td></tr>'}</tbody>
