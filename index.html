@@ -235,9 +235,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div id="abox-resumen"></div>
 
         <div class="panel" style="margin-bottom:16px">
-          <div class="ptitle"><div class="d" style="background:var(--y)"></div>Clasificación General — Suma de las 8 Modalidades</div>
+          <div class="ptitle"><div class="d" style="background:var(--y)"></div>Clasificación General — Suma de 7 Modalidades</div>
           <div style="font-size:11px;color:var(--muted);margin:-8px 0 12px">
-            Suma del puntaje obtenido por cada cuadrilla en todas las modalidades evaluadas. Solo se consideran ganadoras las cuadrillas con la cobertura más completa.
+            Suma del puntaje obtenido por cada cuadrilla en las 7 modalidades de destreza. <strong>Mejor Presentación no suma a este total</strong> — tiene su propio podio independiente. Solo se consideran ganadoras las cuadrillas con la cobertura más completa.
           </div>
           <div class="podio-grid" id="podio-general"></div>
 
@@ -613,11 +613,14 @@ function calcularClasificacionGeneral(){
     MODALIDADES.forEach(mod=>{
       const e = EVALS[key0+"|"+normaliza(mod)];
       if(e){
-        total += e.puntaje;
         evaluadas++;
-        if(normaliza(mod)!==MODALIDAD_SIN_DESEMPATE_TIEMPO && e.tiempoSeg!=null){
-          tiempoTotalSeg += e.tiempoSeg;
-          tieneTiempo = true;
+        // "Mejor Presentación" no suma al puntaje general (solo tiene podio propio)
+        if(normaliza(mod)!==MODALIDAD_SIN_DESEMPATE_TIEMPO){
+          total += e.puntaje;
+          if(e.tiempoSeg!=null){
+            tiempoTotalSeg += e.tiempoSeg;
+            tieneTiempo = true;
+          }
         }
       }
     });
@@ -1044,7 +1047,7 @@ function generarActaImprimir(){
     </div>
   `;
 
-  html += `<div class="acta-seccion">🥇 Clasificación General</div>`;
+  html += `<div class="acta-seccion">🥇 Clasificación General (suma de 7 modalidades — no incluye Mejor Presentación)</div>`;
   if(!clasifGeneral.length){
     html += `<p style="font-size:12px;color:#777">Sin evaluaciones suficientes al momento de generar este acta.</p>`;
   } else {
